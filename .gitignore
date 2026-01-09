@@ -8,3 +8,8 @@ progress.txt
 
 # OS files
 .DS_Store
+
+# Node/TypeScript
+node_modules/
+dist/
+*.log
