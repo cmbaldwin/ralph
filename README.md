@@ -1,196 +1,240 @@
-# Ralph
+# Ralph - Autonomous Development Agent
 
-![Ralph](ralph.webp)
+This directory contains files for **Ralph**, an autonomous AI development agent that incrementally implements features from Product Requirements Documents (PRDs).
 
-Ralph is an autonomous AI agent loop that runs [Amp](https://ampcode.com) repeatedly until all PRD items are complete. Each iteration is a fresh Amp instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+## Files
 
-Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
+### Core Files
 
-[Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
+- **prd.json** - Task tracking with user stories, priorities, and completion status
+- **progress.txt** - Append-only learning journal documenting completed work and patterns discovered
+- **prompt.md** - Instructions for Ralph agent
+- **prompt.example-rails.md** - Rails-specific example implementation
+- **ralph.sh** - Bash script for automated loop execution
 
-## Prerequisites
+### Usage
 
-- [Amp CLI](https://ampcode.com) installed and authenticated
-- `jq` installed (`brew install jq` on macOS)
-- A git repository for your project
+## VS Code Copilot Integration (Recommended)
 
-## Setup
+Ralph can be integrated into VS Code Copilot via custom instructions:
 
-### Option 1: Copy to your project
+1. **Setup** (one-time):
 
-Copy the ralph files into your project:
+   - Add custom instructions to `/.github/copilot-instructions.md`
+   - Include Ralph patterns in `/AGENTS.md`
+
+2. **Use Ralph**:
+
+   - Run `./ralph.sh [max_iterations]` OR use VS Code Copilot Chat
+   - Say "Start working on the PRD" or "Go"
+   - Ralph will automatically:
+     - Read `prd.json` for incomplete stories
+     - Read `progress.txt` for previous learnings
+     - Select highest-priority incomplete story
+     - Implement it completely
+     - Run quality checks (linting + tests)
+     - Commit if passing
+     - Update `prd.json` and `progress.txt`
+
+3. **Monitor Progress**:
+
+   ```bash
+   # View completion status
+   cat prd.json | jq '.userStories[] | select(.passes == true) | .title'
+
+   # View remaining tasks
+   cat prd.json | jq '.userStories[] | select(.passes == false) | {id, title, priority}'
+
+   # Recent learnings
+   tail -n 50 progress.txt
+   ```
+
+## Automated Loop Workflow
+
+Ralph can run as an automated bash loop using multiple AI providers:
 
 ```bash
-# From your project root
-mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
-cp /path/to/ralph/prompt.md scripts/ralph/
-chmod +x scripts/ralph/ralph.sh
+# Run Ralph in loop mode (max 10 iterations)
+./ralph.sh 10
+
+# Run with custom max iterations
+./ralph.sh 20
 ```
 
-### Option 2: Install skills globally
+**How it works:**
 
-Copy the skills to your Amp config for use across all projects:
+1. Loop reads `prd.json` to find incomplete stories
+2. Selects best available provider (checks amp, claude, copilot in order)
+3. Invokes provider with `prompt.md` as instructions
+4. Agent implements one story, runs tests, commits
+5. Agent updates `prd.json` and `progress.txt`
+6. Loop continues until all stories pass or max iterations reached
+7. Agent outputs `<promise>COMPLETE</promise>` when done
 
-```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/ralph ~/.config/amp/skills/
-```
+**Provider Selection:**
 
-### Configure Amp auto-handoff (recommended)
+- Checks each provider for available credits/capacity
+- Prefers: amp → claude → copilot
+- Falls back gracefully if a provider is rate-limited
+- Waits 5 minutes and retries if all providers unavailable
 
-Add to `~/.config/amp/settings.json`:
+## prd.json Structure
 
 ```json
 {
-  "amp.experimental.autoHandoff": { "context": 90 }
+  "project": "MyApp",
+  "branchName": "ralph/feature-name",
+  "description": "High-level feature description",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Short story title",
+      "description": "As a... I want... So that...",
+      "acceptanceCriteria": [
+        "Specific requirement 1",
+        "Specific requirement 2"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Additional context"
+    }
+  ]
 }
 ```
 
-This enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.
+**Key Fields:**
 
-## Workflow
+- `passes: false` - Story incomplete, Ralph should work on it
+- `passes: true` - Story complete, Ralph skips it
+- `priority` - Lower numbers = higher priority (1 is highest)
 
-### 1. Create a PRD
+## progress.txt Format
 
-Use the PRD skill to generate a detailed requirements document:
-
-```
-Load the prd skill and create a PRD for [your feature description]
-```
-
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
-
-### 2. Convert PRD to Ralph format
-
-Use the Ralph skill to convert the markdown PRD to JSON:
+Ralph appends entries after completing each story:
 
 ```
-Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
+[YYYY-MM-DD HH:MM:SS] Story: <story title>
+Implemented: <what was built>
+Files: <list of modified files>
+Tests: PASSING
+Learnings:
+- <reusable pattern discovered>
+- <gotcha or constraint found>
 ```
 
-This creates `prd.json` with user stories structured for autonomous execution.
+**Purpose:**
 
-### 3. Run Ralph
+- Provides learning continuity across agent sessions
+- Documents patterns for future work
+- Helps debug issues from previous iterations
+- Serves as lightweight change log
+
+## Ralph's Workflow
+
+### 1. Context Gathering
+
+- Reads `prd.json` for tasks
+- Reads `progress.txt` for learnings
+- Reviews git history
+- Checks `AGENTS.md` files for patterns
+
+### 2. Task Selection
+
+- Finds highest-priority story where `passes: false`
+- Works on ONE story at a time
+
+### 3. Implementation
+
+- Searches codebase for existing patterns
+- Follows Rails conventions
+- Implements feature completely
+
+### 4. Quality Gates (MUST PASS)
 
 ```bash
-./scripts/ralph/ralph.sh [max_iterations]
+# Linting
+bundle exec rubocop --autocorrect
+
+# Tests (excluding system tests)
+bundle exec rspec --exclude-pattern="spec/system/**/*_spec.rb"
 ```
 
-Default is 10 iterations.
+### 5. Documentation
 
-Ralph will:
-1. Create a feature branch (from PRD `branchName`)
-2. Pick the highest priority story where `passes: false`
-3. Implement that single story
-4. Run quality checks (typecheck, tests)
-5. Commit if checks pass
-6. Update `prd.json` to mark story as `passes: true`
-7. Append learnings to `progress.txt`
-8. Repeat until all stories pass or max iterations reached
+- Commits changes with proper format
+- Updates story to `passes: true` in prd.json
+- Appends learnings to progress.txt
 
-## Key Files
+### 6. Complete
 
-| File | Purpose |
-|------|---------|
-| `ralph.sh` | The bash loop that spawns fresh Amp instances |
-| `prompt.md` | Instructions given to each Amp instance |
-| `prd.json` | User stories with `passes` status (the task list) |
-| `prd.json.example` | Example PRD format for reference |
-| `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs |
-| `skills/ralph/` | Skill for converting PRDs to JSON |
-| `flowchart/` | Interactive visualization of how Ralph works |
+When all stories have `passes: true`, Ralph reports completion
 
-## Flowchart
+## Creating a New PRD
 
-[![Ralph Flowchart](ralph-flowchart.png)](https://snarktank.github.io/ralph/)
+1. **Copy template:**
 
-**[View Interactive Flowchart](https://snarktank.github.io/ralph/)** - Click through to see each step with animations.
+   ```bash
+   cp prd.json prd-new-feature.json
+   ```
 
-The `flowchart/` directory contains the source code. To run locally:
+2. **Edit fields:**
 
-```bash
-cd flowchart
-npm install
-npm run dev
+   - Update `branchName` to `ralph/feature-name`
+   - Update `description`
+   - Define `userStories` with priorities
+
+3. **Create branch:**
+
+   ```bash
+   git checkout -b ralph/feature-name
+   ```
+
+4. **Start Ralph:**
+   - VS Code: Point Ralph at new PRD file
+   - Bash: `./ralph.sh 10` (after updating script to use new file)
+
+## Quality Standards
+
+All Ralph commits must pass:
+
+- ✅ Linting: `bundle exec rubocop --autocorrect`
+- ✅ Tests: `bundle exec rspec --exclude-pattern="spec/system/**/*_spec.rb"`
+- ✅ No failures or errors
+
+## Git Commit Format
+
+```
+<type>: <description>
+
+Co-Authored-By: Ralph (Autonomous Agent) <ralph@example.com>
 ```
 
-## Critical Concepts
+**Types:** `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 
-### Each Iteration = Fresh Context
+## Tips
 
-Each iteration spawns a **new Amp instance** with clean context. The only memory between iterations is:
-- Git history (commits from previous iterations)
-- `progress.txt` (learnings and context)
-- `prd.json` (which stories are done)
-
-### Small Tasks
-
-Each PRD item should be small enough to complete in one context window. If a task is too big, the LLM runs out of context before finishing and produces poor code.
-
-Right-sized stories:
-- Add a database column and migration
-- Add a UI component to an existing page
-- Update a server action with new logic
-- Add a filter dropdown to a list
-
-Too big (split these):
-- "Build the entire dashboard"
-- "Add authentication"
-- "Refactor the API"
-
-### AGENTS.md Updates Are Critical
-
-After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because Amp automatically reads these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
-
-Examples of what to add to AGENTS.md:
-- Patterns discovered ("this codebase uses X for Y")
-- Gotchas ("do not forget to update Z when changing W")
-- Useful context ("the settings panel is in component X")
-
-### Feedback Loops
-
-Ralph only works if there are feedback loops:
-- Typecheck catches type errors
-- Tests verify behavior
-- CI must stay green (broken code compounds across iterations)
-
-### Browser Verification for UI Stories
-
-Frontend stories must include "Verify in browser using dev-browser skill" in acceptance criteria. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
-
-### Stop Condition
-
-When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>` and the loop exits.
-
-## Debugging
-
-Check current state:
-
-```bash
-# See which stories are done
-cat prd.json | jq '.userStories[] | {id, title, passes}'
-
-# See learnings from previous iterations
-cat progress.txt
-
-# Check git history
-git log --oneline -10
-```
-
-## Customizing prompt.md
-
-Edit `prompt.md` to customize Ralph's behavior for your project:
-- Add project-specific quality check commands
-- Include codebase conventions
-- Add common gotchas for your stack
+- **One story per session** - Ralph focuses on complete implementation
+- **Search before coding** - Ralph looks for existing patterns first
+- **Quality first** - Never commit broken code
+- **Document learnings** - Help future Ralph iterations
 
 ## Archiving
 
-Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
+When switching to a new PRD, the bash script automatically archives:
 
-## References
+- Previous `prd.json`
+- Previous `progress.txt`
 
-- [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
-- [Amp documentation](https://ampcode.com/manual)
+Archives go to: `scripts/ralph/archive/YYYY-MM-DD-feature-name/`
+
+## Resources
+
+- **Ralph Instructions**: `/.github/copilot-instructions.md`
+- **Oroshi Patterns**: `/AGENTS.md`
+- **Deployment Guide**: `/claude.md` (includes Ralph section)
+- **Project Specs**: `/specs/PROJECT_OVERVIEW.md`
+
+---
+
+**Last Updated:** January 8, 2026
+**Oroshi Version:** Rails 8.1.1, Ruby 4.0.0

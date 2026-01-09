@@ -1,10 +1,10 @@
-# Ralph Agent Instructions
+# Ralph Agent Instructions - Rails Project Example
 
 ## Context
 
-You are an autonomous AI agent executing within the Ralph loop system. This agent workflow can work with any programming language or framework.
+You are an autonomous AI agent executing within the Ralph loop system, working on **[project-name]**, a Rails application built with Ruby on Rails 8.1.1 and Ruby 4.0.0.
 
-**IMPORTANT**: This is a fresh agent instance. Your only memory comes from:
+**IMPORTANT**: This is a fresh Amp instance. Your only memory comes from:
 
 - Git history (previous commits)
 - `progress.txt` (append-only learnings from previous iterations)
@@ -28,20 +28,20 @@ You are an autonomous AI agent executing within the Ralph loop system. This agen
 3. **Implement Feature**
 
    - Implement the single user story completely
-   - Follow language/framework best practices and conventions
+   - Follow Rails 8 best practices and conventions
    - Search codebase before assuming features don't exist
 
 4. **Quality Checks** (MUST PASS before committing)
 
-   - Run appropriate linting/formatting tools for your project
-   - Run tests (unit, integration, etc.)
+   - Run: `bundle exec rubocop --autocorrect` (linting)
+   - Run: `bundle exec rspec` (tests - exclude system tests with `--exclude-pattern="spec/system/**/*_spec.rb"`)
    - Verify no errors or failures
    - For UI changes: Manually verify in browser if possible
 
 5. **Commit Changes**
 
    - Commit ONLY if all quality checks pass
-   - Use conventional commits format: `feat: <story description>` or `fix: <story description>`
+   - Use format: `feat: <story description>` or `fix: <story description>`
    - Include Co-authored-by: `Co-Authored-By: Ralph (Autonomous Agent) <ralph@example.com>`
 
 6. **Update Documentation**
@@ -67,10 +67,10 @@ Learnings for future iterations:
 
 ```
 === CODEBASE PATTERNS ===
-- Key architectural patterns
-- Testing conventions
-- Build/deployment commands
-- Critical gotchas or constraints
+- Use Solid Queue for background jobs (not Sidekiq)
+- Turbo Streams for real-time updates
+- Database: 4 separate databases (main, queue, cache, cable)
+- Testing: MiniTest, exclude system tests during CI
 ===
 ```
 
@@ -85,10 +85,10 @@ When working in a directory, check for `AGENTS.md` files and update with:
 
 ## Quality Gates (MUST PASS)
 
-All commits require:
+All commits require passing:
 
-1. **Linting/Formatting**: Run appropriate tools for your language/framework
-2. **Tests**: All tests passing (unit, integration, etc.)
+1. **Linting**: `bundle exec rubocop --autocorrect`
+2. **Tests**: `bundle exec rspec --exclude-pattern="spec/system/**/*_spec.rb"`
 3. **No errors**: Zero failures, zero errors
 
 **CRITICAL**: Never commit broken code. If quality checks fail, fix them first.
@@ -105,13 +105,54 @@ This signals to Ralph that the autonomous loop should terminate successfully.
 
 ## Project-Specific Patterns
 
-Check `AGENTS.md` and project documentation for:
+### Technology Stack
 
-- Technology stack and version requirements
-- Critical architectural patterns or gotchas
-- Testing conventions and commands
-- Build and deployment processes
-- Database setup and management
+- **Rails**: 8.1.1
+- **Ruby**: 4.0.0 (required)
+- **Database**: PostgreSQL 16 (4 databases: main, queue, cache, cable)
+- **Background Jobs**: Solid Queue (NOT Sidekiq)
+- **Caching**: Solid Cache (PostgreSQL-backed)
+- **Cable**: Solid Cable (PostgreSQL-backed)
+- **Assets**: Propshaft + importmap (NOT Sprockets)
+- **Testing**: RSpec
+- **Real-time**: Turbo Streams + Action Cable
+
+### Critical Gotchas
+
+1. **Production.rb must explicitly require Solid gems** at the top before configuration
+2. **4 separate databases** - main, queue, cache, cable (schema files: `db/schema.rb`, `db/queue_schema.rb`, `db/cache_schema.rb`, `db/cable_schema.rb`)
+3. **No Sidekiq** - use Solid Queue for all background jobs
+4. **Exclude system tests** during automated runs: `--exclude-pattern="spec/system/**/*_spec.rb"`
+5. **Action Cable requires domain** configured via `ENV['KAMAL_DOMAIN']`
+
+### Quality Commands
+
+```bash
+# Linting (auto-fix)
+bundle exec rubocop --autocorrect
+
+# Tests (exclude system tests)
+bundle exec rspec --exclude-pattern="spec/system/**/*_spec.rb"
+
+# Database setup (if needed)
+bin/rails db:create db:migrate
+bin/rails db:schema:load:queue
+bin/rails db:schema:load:cache
+bin/rails db:schema:load:cable
+```
+
+## Project Structure
+
+- **prd.json** - User stories with completion status (your task list)
+- **progress.txt** - Append-only learnings from previous iterations
+- **AGENTS.md** - Project build/run instructions and patterns
+- **specs/** - Project specifications and requirements
+- **app/** - Rails application code (models, controllers, views, jobs, etc.)
+- **spec/** - RSpec test suite (models, requests, system tests)
+- **lib/** - Custom library code (Printable, API clients, etc.)
+- **config/** - Rails configuration and deployment files
+- **db/** - Database schemas and migrations (4 schema files)
+- **CLAUDE.md** - Production deployment guide
 
 ## Key Constraints
 
@@ -119,7 +160,7 @@ Check `AGENTS.md` and project documentation for:
 2. **Quality gates must pass** - No broken commits allowed
 3. **Update prd.json** - Mark stories as `passes: true` when complete
 4. **Append to progress.txt** - Document learnings for future iterations
-5. **Follow project conventions** - Use established patterns in the codebase
+5. **Follow Rails conventions** - Use established patterns in the codebase
 6. **Search before coding** - Don't reinvent existing functionality
 
 ## Success Criteria
@@ -127,7 +168,7 @@ Check `AGENTS.md` and project documentation for:
 Your work is complete when:
 
 - Current user story is fully implemented
-- All quality checks pass (linting + tests)
+- All quality checks pass (rubocop + rspec)
 - Changes are committed to git
 - `prd.json` story is marked `passes: true`
 - `progress.txt` is updated with learnings
@@ -136,4 +177,4 @@ When ALL stories in `prd.json` have `passes: true`, output `<promise>COMPLETE</p
 
 ---
 
-**Remember**: You are a fresh agent instance. Read context files first, implement ONE story, pass quality gates, commit, document. That's the loop.
+**Remember**: You are a fresh Amp instance. Read context files first, implement ONE story, pass quality gates, commit, document. That's the loop.

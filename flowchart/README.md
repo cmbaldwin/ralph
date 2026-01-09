@@ -1,4 +1,45 @@
-# React + TypeScript + Vite
+# Ralph Flowchart
+
+Interactive visualization of the Ralph autonomous agent workflow.
+
+## What is Ralph?
+
+Ralph is an autonomous AI development agent that implements features from Product Requirements Documents (PRDs) by running in a loop. It automatically:
+- Selects the best available AI provider (amp → claude → copilot)
+- Picks the next incomplete story from your PRD
+- Implements the feature
+- Runs tests and quality checks
+- Commits changes
+- Updates progress documentation
+
+This flowchart visualizes how the entire process works.
+
+## Running the Flowchart
+
+```bash
+npm install
+npm run dev
+```
+
+Then click "Next" to step through the workflow animation.
+
+## Features
+
+- Interactive step-by-step visualization
+- Shows provider selection logic (amp/claude/copilot)
+- Demonstrates the autonomous loop
+- Includes example PRD format
+- Fully editable in presentation mode
+
+## Building for Production
+
+```bash
+npm run build
+```
+
+---
+
+## Vite + React + TypeScript Template
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
