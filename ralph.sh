@@ -27,7 +27,7 @@ check_credits() {
       test_output=$(echo "Respond with only the word: OK" | timeout 30 amp --dangerously-allow-all 2>&1) || exit_code=$?
       ;;
     claude)
-      test_output=$(echo "Respond with only the word: OK" | timeout 30 claude --print --dangerously-skip-permissions 2>&1) || exit_code=$?
+      test_output=$(echo "Respond with only the word: OK" | timeout 30 claude --dangerously-skip-permissions 2>&1) || exit_code=$?
       ;;
     copilot)
       test_output=$(timeout 30 copilot -p "Respond with only the word: OK" --allow-all-tools -s 2>&1) || exit_code=$?
@@ -74,22 +74,45 @@ select_provider() {
   return 1
 }
 
-# Run the AI agent with the given prompt file
+# Run the AI agent with the given prompt file and show live preview
 run_agent() {
   local provider=$1
   local prompt_file=$2
+  local temp_file=$(mktemp)
+  local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
 
+  # Start the agent process
   case "$provider" in
     amp)
-      cat "$prompt_file" | amp --dangerously-allow-all 2>&1
+      cat "$prompt_file" | amp --dangerously-allow-all > "$temp_file" 2>&1 &
       ;;
     claude)
-      cat "$prompt_file" | claude --print --dangerously-skip-permissions 2>&1
+      cat "$prompt_file" | claude --dangerously-skip-permissions > "$temp_file" 2>&1 &
       ;;
     copilot)
-      copilot -p "$(cat "$prompt_file")" --allow-all-tools 2>&1
+      copilot -p "$(cat "$prompt_file")" --allow-all-tools > "$temp_file" 2>&1 &
       ;;
   esac
+  
+  local agent_pid=$!
+  local i=0
+  
+  # Simple spinner while agent is running
+  while kill -0 $agent_pid 2>/dev/null; do
+    local char="${spinstr:$i:1}"
+    printf "\r  %s Working with %s..." "$char" "$provider" >&2
+    i=$(( (i+1) %10 ))
+    sleep 0.15
+  done
+  
+  wait $agent_pid
+  
+  # Clear the spinner line
+  printf "\r\033[K" >&2
+  
+  # Return the output
+  cat "$temp_file"
+  rm -f "$temp_file"
 }
 
 # Archive previous run if branch changed
@@ -150,9 +173,25 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     }
   }
   echo "Selected provider: $PROVIDER"
+  echo ""
   
   # Run the agent with selected provider
-  OUTPUT=$(run_agent "$PROVIDER" "$SCRIPT_DIR/prompt.md" | tee /dev/stderr) || true
+  OUTPUT=$(run_agent "$PROVIDER" "$SCRIPT_DIR/prompt.md") || true
+  
+  # Check if the run failed due to credits/rate limit
+  if echo "$OUTPUT" | grep -qiE "rate.?limit|quota|too many|capacity|overloaded|try again|exceeded|insufficient|credit"; then
+    echo "Provider failed. Retrying with different provider..."
+    
+    # Try next provider
+    PROVIDER=$(select_provider) || {
+      echo "No providers available. Waiting 5 minutes before retry..."
+      sleep 300
+      continue
+    }
+    echo "Selected provider: $PROVIDER"
+    echo ""
+    OUTPUT=$(run_agent "$PROVIDER" "$SCRIPT_DIR/prompt.md") || true
+  fi
   
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
