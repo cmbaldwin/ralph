@@ -13,3 +13,4 @@ progress.txt
 node_modules/
 dist/
 *.log
+package-lock.json

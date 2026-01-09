@@ -78,6 +78,33 @@ Ralph can run as an automated bash loop using multiple AI providers:
 - Falls back gracefully if a provider is rate-limited
 - Waits 5 minutes and retries if all providers unavailable
 
+### Enhanced UI (Optional)
+
+For a more polished terminal experience with animated spinners and live status updates, use the Ink-based TypeScript version:
+
+**Setup** (one-time):
+
+```bash
+npm install
+npm run build
+```
+
+**Run:**
+
+```bash
+npm start 10        # Run with max 10 iterations
+npm run dev 25      # Build and run with max 25 iterations
+```
+
+**Features:**
+
+- ✨ Animated spinner while agent works
+- 🎨 Color-coded status messages
+- 📊 Real-time iteration progress
+- 🎉 Celebration on completion
+
+The Ink version provides the same functionality as `ralph.sh` with a modern CLI interface. Both versions use the same `prd.json`, `progress.txt`, and `prompt.md` files.
+
 ## prd.json Structure
 
 ```json

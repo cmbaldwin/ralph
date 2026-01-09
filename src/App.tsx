@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
-import chalk from 'chalk';
-import { checkCredits, selectProvider, runAgent } from './agent.js';
+import React, { useState, useEffect } from "react";
+import { Box, Text } from "ink";
+import Spinner from "ink-spinner";
+import chalk from "chalk";
+import { checkCredits, selectProvider, runAgent } from "./agent.js";
 
 interface AppProps {
   maxIterations: number;
@@ -10,11 +10,12 @@ interface AppProps {
 
 const App: React.FC<AppProps> = ({ maxIterations }) => {
   const [currentIteration, setCurrentIteration] = useState(0);
-  const [status, setStatus] = useState('Starting Ralph...');
+  const [status, setStatus] = useState("Starting Ralph...");
   const [provider, setProvider] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [outputLines, setOutputLines] = useState<string[]>([]);
 
   useEffect(() => {
     runRalph();
@@ -23,26 +24,29 @@ const App: React.FC<AppProps> = ({ maxIterations }) => {
   const runRalph = async () => {
     for (let i = 1; i <= maxIterations; i++) {
       setCurrentIteration(i);
-      setStatus('Selecting provider...');
+      setStatus("Selecting provider...");
 
       try {
         // Select provider
         const selectedProvider = await selectProvider(setStatus);
         if (!selectedProvider) {
-          setError('No providers available');
+          setError("No providers available");
           return;
         }
-        
+
         setProvider(selectedProvider);
         setStatus(`Running with ${selectedProvider}...`);
         setIsRunning(true);
+        setOutputLines([]);
 
-        // Run the agent
-        const output = await runAgent(selectedProvider);
+        // Run the agent with streaming output
+        const output = await runAgent(selectedProvider, (line) => {
+          setOutputLines((prev) => [...prev.slice(-3), line]);
+        });
         setIsRunning(false);
 
         // Check for completion
-        if (output.includes('<promise>COMPLETE</promise>')) {
+        if (output.includes("<promise>COMPLETE</promise>")) {
           setCompleted(true);
           setStatus(`Completed at iteration ${i} of ${maxIterations}`);
           setTimeout(() => process.exit(0), 2000);
@@ -50,11 +54,10 @@ const App: React.FC<AppProps> = ({ maxIterations }) => {
         }
 
         setStatus(`Iteration ${i} complete`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       } catch (err) {
         setIsRunning(false);
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        setError(err instanceof Error ? err.message : "Unknown error");
         return;
       }
     }
@@ -73,8 +76,11 @@ const App: React.FC<AppProps> = ({ maxIterations }) => {
 
       <Box marginBottom={1}>
         <Text>
-          Iteration: <Text bold color="yellow">{currentIteration}</Text>
-          {' / '}
+          Iteration:{" "}
+          <Text bold color="yellow">
+            {currentIteration}
+          </Text>
+          {" / "}
           <Text dimColor>{maxIterations}</Text>
         </Text>
       </Box>
@@ -82,7 +88,10 @@ const App: React.FC<AppProps> = ({ maxIterations }) => {
       {provider && (
         <Box marginBottom={1}>
           <Text>
-            Provider: <Text bold color="green">{provider}</Text>
+            Provider:{" "}
+            <Text bold color="green">
+              {provider}
+            </Text>
           </Text>
         </Box>
       )}
@@ -92,21 +101,32 @@ const App: React.FC<AppProps> = ({ maxIterations }) => {
           <Text>
             <Text color="green">
               <Spinner type="dots" />
-            </Text>
-            {' '}
+            </Text>{" "}
             {status}
           </Text>
         )}
         {!isRunning && !error && !completed && (
           <Text color="blue">● {status}</Text>
         )}
-        {completed && (
-          <Text color="green">✓ {status}</Text>
-        )}
-        {error && (
-          <Text color="red">✗ {error}</Text>
-        )}
+        {completed && <Text color="green">✓ {status}</Text>}
+        {error && <Text color="red">✗ {error}</Text>}
       </Box>
+
+      {isRunning && outputLines.length > 0 && (
+        <Box
+          flexDirection="column"
+          borderStyle="round"
+          borderColor="gray"
+          paddingX={1}
+          marginBottom={1}
+        >
+          {outputLines.map((line, i) => (
+            <Text key={i} dimColor>
+              {line.slice(0, 120)}
+            </Text>
+          ))}
+        </Box>
+      )}
 
       {completed && (
         <Box borderStyle="round" borderColor="green" padding={1}>
