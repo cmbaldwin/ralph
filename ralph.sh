@@ -37,8 +37,8 @@ check_credits() {
       ;;
   esac
 
-  # Check for rate limit indicators
-  if echo "$test_output" | grep -qiE "rate.?limit|quota|too many|capacity|overloaded|try again|exceeded"; then
+  # Check for rate limit indicators and credit issues
+  if echo "$test_output" | grep -qiE "rate.?limit|quota|too many|capacity|overloaded|try again|exceeded|insufficient|credit"; then
     return 1
   fi
 
